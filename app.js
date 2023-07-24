@@ -3,7 +3,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -45,44 +46,53 @@ app.get("/logout", (req, res)=>{
     res.render("home");
 });
 
+const saltRounds = 10;
 
 app.post("/register", (req, res)=>{
     
-    const newUser = new User({
-        email : req.body.username,
-        password: md5(req.body.password)
-    });
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
 
-    newUser.save()
-        .then(()=>{
-            console.log("Account created successfuly");
-            res.render("secrets");
-        })
-        .catch(err=>{
-            console.log("Error creating account: ", err);
-        });
+      const newUser = new User({
+        email : req.body.username,
+        password: hash   //save generated hash as password
+      });
+
+      newUser.save()
+          .then(()=>{
+              console.log("Account created successfuly");
+              res.render("secrets");
+          })
+          .catch(err=>{
+              console.log("Error creating account: ", err);
+          });
+    });
 });
 
 
 app.post("/login", async (req, res) => {
     const email = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
   
     User.findOne({ email })
     .then((user) => {
+
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      if (password === user.password) {
-        return res.status(200).render("secrets");
-      } else {
-        return res.status(401).json({ error: "Invalid password" });
-      }
+      bcrypt.compare(password, user.password, (err, result)=>{
+        if(result)
+            return res.status(200).render("secrets");
+        else
+          return res.status(401).json({ error: "Invalid password" });
+        
+      });
     })
     .catch((err) => {
+
       console.error("Error during login:", err);
       res.status(500).json({ error: "Internal server error" });
+      
     });
 
   });
