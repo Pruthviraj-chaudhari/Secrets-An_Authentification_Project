@@ -36,14 +36,11 @@ mongoose.connect("mongodb://127.0.0.1:27017/userDB", { useNewUrlParser: true, us
 
 // User model and passport setup
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String
-  },
-  password: {
-    type: String
-  },
+  username: String,
+  password: String,
   googleId: String,
-  githubId: String
+  githubId: String,
+  secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -142,11 +139,42 @@ app.get("/logout", (req, res) => {
 });
 
 app.get("/secrets", (req, res) => {
+  User.find({ "secret": { $ne: null } })
+    .then((foundUsers) => {
+      res.render("secrets", { usersWithSecret: foundUsers });
+    })
+    .catch(err => {
+      console.log(err);
+    });
+});
+
+app.get("/submit", (req, res) => {
   if (req.isAuthenticated()) {
-    res.render("secrets");
+    res.render("submit");
   } else {
     res.redirect("/login");
   }
+});
+
+app.post("/submit", (req, res) => {
+  const submittedSecret = req.body.secret;
+  User.findById(req.user.id)
+    .then((foundUser) => {
+      if (foundUser) {
+        foundUser.secret = submittedSecret;
+        foundUser.save()
+          .then(() => {
+            console.log("Secret posted successfully");
+            res.redirect("/secrets");
+          })
+          .catch(err => {
+            console.log(err);
+          });
+      }
+    })
+    .catch(err => {
+      console.log(err);
+    });
 });
 
 // Post
